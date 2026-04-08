@@ -270,6 +270,8 @@ body {
 .fc-btn.prev { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
 .fc-btn.next { background: var(--accent); color: #fff; }
 .fc-btn.shuffle { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+.fc-btn.bookmark-fc { background: var(--surface2); color: var(--muted); border: 1px solid var(--border); }
+.fc-btn.bookmarked-fc { background: rgba(246,224,94,0.15); color: var(--yellow); border: 1px solid var(--yellow); }
 
 .fc-done {
   text-align: center;

@@ -4,7 +4,7 @@ import { vocabData } from './data.js';
 const state = {
   view: 'vocab',          // 'vocab' | 'flashcard' | 'test'
   chapterIdx: 0,
-  partIdx: 0,
+  partIdx: 0,             // -1 = bookmarked deck
   bookmarks: new Set(JSON.parse(localStorage.getItem('bookmarks') || '[]')),
   showBookmarksOnly: false,
   searchQuery: '',
@@ -142,7 +142,10 @@ function renderVocabView() {
 function renderFlashcardView() {
   const ch = currentChapter();
   const deck = state.fcDeck;
-  const done = state.fcIndex >= deck.length;
+  const done = state.fcIndex >= deck.length && deck.length > 0;
+  const isEmpty = deck.length === 0;
+  const word = deck[state.fcIndex];
+  const isBookmarked = word ? state.bookmarks.has(bookmarkKey(word)) : false;
 
   return `
     <div class="chapter-header">
@@ -161,9 +164,17 @@ function renderFlashcardView() {
           Part ${p.part_id}
         </button>
       `).join('')}
+      <button class="part-btn ${state.partIdx === -1 ? 'active' : ''}" data-part="-1">
+        ⭐ Bookmarked
+      </button>
     </div>
 
-    ${done ? `
+    ${isEmpty ? `
+      <div class="fc-done">
+        <h2>No cards here</h2>
+        <p>${state.partIdx === -1 ? 'Bookmark some words first to study them here.' : 'This part has no vocabulary.'}</p>
+      </div>
+    ` : done ? `
       <div class="fc-done">
         <h2>🎉 All done!</h2>
         <p>You've gone through all ${deck.length} cards.</p>
@@ -178,19 +189,22 @@ function renderFlashcardView() {
         <div class="flashcard ${state.fcFlipped ? 'flipped' : ''}" id="flashcard">
           <div class="fc-inner">
             <div class="fc-front">
-              <div class="fc-kanji">${deck[state.fcIndex].kanji}</div>
-              <div class="fc-hiragana">${deck[state.fcIndex].hiragana}</div>
+              <div class="fc-kanji">${word.kanji}</div>
+              <div class="fc-hiragana">${word.hiragana}</div>
               <div class="fc-hint">tap to reveal</div>
             </div>
             <div class="fc-back">
-              <div class="fc-english">${deck[state.fcIndex].english}</div>
-              <div class="fc-kanji" style="font-size:1.5rem">${deck[state.fcIndex].kanji}</div>
+              <div class="fc-english">${word.english}</div>
+              <div class="fc-kanji" style="font-size:1.5rem">${word.kanji}</div>
             </div>
           </div>
         </div>
         <div class="fc-controls">
           <button class="fc-btn prev" id="fcPrev">← Prev</button>
           <button class="fc-btn shuffle" id="fcShuffle">🔀 Shuffle</button>
+          <button class="fc-btn bookmark-fc ${isBookmarked ? 'bookmarked-fc' : ''}" id="fcBookmark">
+            ${isBookmarked ? '⭐ Bookmarked' : '☆ Bookmark'}
+          </button>
           <button class="fc-btn next" id="fcNext">Next →</button>
         </div>
       </div>
@@ -369,6 +383,11 @@ function attachEvents() {
     render();
   });
 
+  document.getElementById('fcBookmark')?.addEventListener('click', () => {
+    toggleBookmarkCurrentCard();
+    render();
+  });
+
   // Test options
   document.querySelectorAll('.test-option[data-opt]').forEach((btn, _, all) => {
     btn.addEventListener('click', () => {
@@ -396,9 +415,28 @@ function attachEvents() {
 
 // ── Init ───────────────────────────────────────────────────────────────────
 function initFlashcardDeck() {
-  state.fcDeck = [...currentPart().vocabulary];
+  if (state.partIdx === -1) {
+    // bookmarked deck: all bookmarked words across all vocab
+    state.fcDeck = allVocab().filter(w => state.bookmarks.has(bookmarkKey(w)));
+  } else {
+    state.fcDeck = [...currentPart().vocabulary];
+  }
   state.fcIndex = 0;
   state.fcFlipped = false;
+}
+
+function toggleBookmarkCurrentCard() {
+  const word = state.fcDeck[state.fcIndex];
+  if (!word) return;
+  const key = bookmarkKey(word);
+  if (state.bookmarks.has(key)) state.bookmarks.delete(key);
+  else state.bookmarks.add(key);
+  saveBookmarks();
+  // if we're in bookmarked deck and unbookmarked, remove from deck
+  if (state.partIdx === -1) {
+    state.fcDeck = state.fcDeck.filter(w => state.bookmarks.has(bookmarkKey(w)));
+    if (state.fcIndex >= state.fcDeck.length) state.fcIndex = Math.max(0, state.fcDeck.length - 1);
+  }
 }
 
 initFlashcardDeck();
